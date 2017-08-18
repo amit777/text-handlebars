@@ -139,6 +139,23 @@ sub options {
     return $options;
 }
 
+sub render_string_cached {
+	my $self = shift;
+	my ($text, $vars) = @_;
+	my $vpath = "_handlebars_block_" . md5_hex $text;
+
+	if (ref($self->{path}[0]) ne 'HASH') {
+		unshift @{ $self->{path} }, {};
+	}
+
+	if (!exists $self->{path}[0]{$vpath}) {
+		$self->{path}[0]{$vpath} = $text;
+	}
+
+	return $self->render($vpath, $vars);
+}
+
+
 sub _register_builtin_methods {
     my $self = shift;
     my ($funcs) = @_;
@@ -146,7 +163,7 @@ sub _register_builtin_methods {
     weaken(my $weakself = $self);
     $funcs->{'(render_string)'} = sub {
         my ($to_render, $vars) = @_;
-        return $weakself->render_string($to_render, $vars);
+        return $weakself->render_string_cached($to_render, $vars);
     };
     $funcs->{'(make_block_helper)'} = sub {
         my ($vars, $code, $raw_text, $else_raw_text, $hash) = @_;
@@ -158,7 +175,7 @@ sub _register_builtin_methods {
                 %{ canonicalize_vars($new_vars) },
                 '..' => $vars,
             };
-            return $weakself->render_string($raw_text, $new_vars);
+            return $weakself->render_string_cached($raw_text, $new_vars);
         };
         $options->{inverse} = sub {
             my ($new_vars) = @_;
@@ -166,7 +183,7 @@ sub _register_builtin_methods {
                 %{ canonicalize_vars($new_vars) },
                 '..' => $vars,
             };
-            return $weakself->render_string($else_raw_text, $new_vars);
+            return $weakself->render_string_cached($else_raw_text, $new_vars);
         };
         $options->{hash} = $hash;
 
